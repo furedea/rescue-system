@@ -1,0 +1,185 @@
+@startuml rescue-system
+
+class Car {
+    -wifi_manager: unique_ptr<WifiManager>
+    -state_manager: shared_ptr<IStateManager>
+
+    +run()
+}
+
+Car *-- WifiManager
+
+class WifiManager {
+    -wlan: unique_ptr<GR_PEACH_WlanBP3595>
+    -address: char*
+    -mask: char*
+    -gateway: char*
+    -ssid: char*
+    -password: char*
+
+    +connect()
+}
+
+Car *-- IStateManager
+
+interface IStateManager {
+    +processState()
+    +setNextState()
+    +hasNextState(): bool
+}
+
+IStateManager <|.right. StateManager
+
+class StateManager {
+    -state_transition_strategy: StateTransitionStrategy*
+    -state_collection: shared_ptr<StateCollection>
+    -current_state: shared_ptr<State>
+    -current_index: int
+}
+
+StateManager o-- StateTransitionStrategy
+
+interface StateTransitionStrategy {
+    +setup_states(state_collection: shared_ptr<StateCollection>)
+}
+
+StateTransitionStrategy <|.. PrivateCarStrategy
+StateTransitionStrategy <|.. RescueCarStrategy
+
+class PrivateCarStrategy {}
+class RescueCarStrategy {}
+
+
+StateManager *-- StateCollection
+StateTransitionStrategy -- StateCollection
+
+class StateCollection {
+    -states: vector<shared_ptr<State>>
+    -state_factory: unique_ptr<StateFactory>
+
+    +addState<T>()
+    +getState(index: int): shared_ptr<State>
+    +size(): int
+}
+
+StateCollection *-- StateFactory
+
+class StateFactory {
+    -line_trace_manager: shared_ptr<LineTraceManager>
+    -message_manager: shared_ptr<MessageManager>
+    +createState<T>(): std::shared_ptr<State>
+}
+
+StateFactory *-- State
+StateFactory *-- LineTraceManager
+StateFactory *-- MessageManager
+
+interface State {
+    +void process(state_manager: IStateManager*)
+}
+
+State -- IStateManager
+State <|.. LineTraceState
+State <|.. CollisionState
+State <|.. ReturnState
+State <|.. RescueState
+State <|.. RescueMoveState
+State <|.. RescueWaitState
+
+class LineTraceState {
+    line_trace_manager: shared_ptr<LineTraceManager>
+    timer: unique_ptr<Timer>
+}
+
+LineTraceState o-- LineTraceManager
+
+class CollisionState {
+    message_manager: shared_ptr<MessageManager>
+}
+
+CollisionState o-- MessageManager
+
+class ReturnState {
+    line_trace_manager: shared_ptr<LineTraceManager>
+}
+
+ReturnState o-- LineTraceManager
+
+class RescueState {
+    message_manager: shared_ptr<MessageManager>
+}
+
+RescueState o-- MessageManager
+
+class RescueMoveState {
+    line_trace_manager: shared_ptr<LineTraceManager>
+}
+
+RescueMoveState o-- LineTraceManager
+
+class RescueWaitState {
+    message_manager: shared_ptr<MessageManager>
+}
+
+RescueWaitState o-- MessageManager
+
+class LineTraceManager {
+    -monitor_line: unique_ptr<MonitorLine>
+    -motor_control: unique_ptr<motor_control>
+    -timer: unique_ptr<Timer>
+
+    +traceLineRight()
+    +traceLineLeft()
+    +reverseLeft()
+    +reverseRight()
+    +isReversed(): bool
+    +isArrived(): bool
+    +isCollided(): bool
+}
+
+LineTraceManager *-- LineMonitor
+LineTraceManager *-- MotorController
+LineTraceManager *-- CollisionDetector
+
+class LineMonitor {
+    -zumo: shared_ptr<Zumo>
+    -irbits: unique_ptr<IrBitField_T>
+
+    +isLeftSensorOnLine(): bool
+    +isCenterSensorOnLine(): bool
+    +isRightSensorOnLine(): bool
+}
+
+class MotorController {
+    -zumo: shared_ptr<Zumo>
+
+    +forward()
+    +reverse()
+    +hardLeft()
+    +hardRight()
+    +right()
+    +left()
+    +move()
+    +stop()
+}
+
+class CollisionDetector {
+    -zumo: shared_ptr<Zumo>
+
+    +isCollided(): bool
+}
+
+class MessageManager {
+    -server: TCPSocketServer
+    -client: TCPSocketConnection
+    -port: int
+    -timeout_ms: int
+    -server_address: char*
+
+    +waitForConnecting()
+    +isReceivedMessage(): bool
+    +connectWithServer()
+    +sendMessage()
+}
+
+@enduml
